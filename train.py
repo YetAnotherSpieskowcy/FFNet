@@ -15,11 +15,12 @@ if __name__=="__main__":
     )
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size of the input")
     parser.add_argument("--num_workers", type=int, default=2, help="Number of workers")
+    parser.add_argument("--log_filename", type=str, required=True, help="Name of log file")
     args = parser.parse_args()
 
 
     logger = logging.getLogger("FFNet")
-    logging.basicConfig(filename='../ffnet_weights/train.log', level=logging.DEBUG)
+    logging.basicConfig(filename=args.log_filename, level=logging.DEBUG)
 
     model = segmentation_ffnet150S_dBBB()
     model.to("cuda")
@@ -38,7 +39,7 @@ if __name__=="__main__":
             pred_labels = model(images)
 
             input_size = images.size(2), images.size(3)
-            output = resize_tensor(pred_labels.long(), input_size, True)
+            output = resize_tensor(pred_labels, input_size, True)
             output_data = torch.nn.functional.softmax(output, dim=1).data
             max_probs, predictions = output_data.max(1)
 
@@ -46,7 +47,7 @@ if __name__=="__main__":
             labels = labels.unsqueeze(0)
 
             optim.zero_grad()
-            loss = loss_function(predictions, labels)
+            loss = loss_function(predictions.float(), labels.float())
             optim.step()
 
             mes = f"Epoch {epoch+1}, iter {it}: loss {loss}"
