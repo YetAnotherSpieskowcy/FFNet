@@ -1,3 +1,4 @@
+import gc
 import logging
 import argparse
 
@@ -48,11 +49,14 @@ if __name__=="__main__":
 
             optim.zero_grad()
             loss = loss_function(predictions.float(), labels.float())
+            loss.require_grad = True
             optim.step()
 
             mes = f"Epoch {epoch+1}, iter {it}: loss {loss}"
             print(mes)
             logger.debug(mes)
+            gc.collect()
+            torch.cuda.empty_cache()
 
         scheduler.step()
 
