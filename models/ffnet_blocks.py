@@ -645,19 +645,19 @@ def create_ffnet(
     )
 
     model.apply(model_weight_initializer)
-    if pretrained:
-        if pretrained_weights_path:
-            print("Loading pretrained model state dict from {}".format(model_wghts))
-            model.init_model(
-                model_wghts,
-                strict_loading=strict_loading,
-                backbone_only=pretrained_backbone_only,
-            )
-        else:
-            print(
-                "No model weights provided, attempting to load imagenet pretrained backbone..."
-            )
-            model.init_model()
+    #if pretrained:
+    #    if pretrained_weights_path:
+    #        print("Loading pretrained model state dict from {}".format(model_wghts))
+    #        model.init_model(
+    #            model_wghts,
+    #            strict_loading=strict_loading,
+    #            backbone_only=pretrained_backbone_only,
+    #        )
+    #    else:
+    #        print(
+    #            "No model weights provided, attempting to load imagenet pretrained backbone..."
+    #        )
+    #        model.init_model()
 
     model.eval()
     return model

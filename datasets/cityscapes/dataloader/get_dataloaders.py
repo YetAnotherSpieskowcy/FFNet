@@ -8,7 +8,7 @@ from config import CITYSCAPES_MEAN, CITYSCAPES_STD
 from datasets.cityscapes.dataloader.base_loader import Cityscapes
 
 
-def return_dataloader(num_workers, batch_size):
+def return_dataloader(num_workers, batch_size, mode="train"):
     """
     Return Dataloader
     """
@@ -23,7 +23,7 @@ def return_dataloader(num_workers, batch_size):
     )
 
     val_frame = Cityscapes(
-        mode="val",
+        mode=mode,
         joint_transform_list=val_joint_transform_list,
         img_transform=val_input_transform,
         label_transform=target_transform,
