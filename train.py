@@ -50,6 +50,7 @@ if __name__=="__main__":
             optim.zero_grad()
             loss = loss_function(predictions.float(), labels.float())
             loss.require_grad = True
+            loss.backward()
             optim.step()
 
             mes = f"Epoch {epoch+1}, iter {it}: loss {loss}"
@@ -59,5 +60,5 @@ if __name__=="__main__":
             torch.cuda.empty_cache()
 
         scheduler.step()
-
-    torch.save(model, "../ffnet_weights/model.pth")
+        if (epoch+1)%15==0:
+            torch.save(model, f"../ffnet_weights/model{epoch+1}.pth")
