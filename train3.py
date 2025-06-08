@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from datasets.cityscapes.dataloader.get_dataloaders import return_dataloader
 from models.ffnet_S_gpu_small import segmentation_ffnet150S_dBBB
+from torch.cuda.amp import GradScaler, autocast
+
 
 NUM_CLASSES, IGNORE_INDEX = 19, 255
 
@@ -28,6 +30,7 @@ val_loader = return_dataloader(
 loss_fn = CrossEntropyLoss(ignore_index=IGNORE_INDEX)
 optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4, weight_decay=4e-5)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+scaler = GradScaler()
 
 best_miou = 0
 
@@ -76,15 +79,18 @@ for epoch in range(150):
         images, labels = images.to(device), labels.to(device, dtype=torch.long)
 
         optimizer.zero_grad(set_to_none=True)
-        logits = F.interpolate(
-            model(images),
-            size=labels.shape[-2:],
-            mode="bilinear",
-            align_corners=False,
-        )
-        loss = loss_fn(logits, labels)
-        loss.backward()
-        optimizer.step()
+        with autocast():
+            logits = F.interpolate(
+                model(images),
+                size=labels.shape[-2:],
+                mode="bilinear",
+                align_corners=False,
+            )
+            loss = loss_fn(logits, labels)
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
         epoch_loss += loss.item()
 
         mask = labels != IGNORE_INDEX
@@ -93,10 +99,9 @@ for epoch in range(150):
             (labels[mask] * NUM_CLASSES + preds[mask]), minlength=NUM_CLASSES**2
         ).reshape(NUM_CLASSES, NUM_CLASSES)
 
-        if i % 50 == 0:
-            print(
-                f"E:{epoch+1}, I:{i}/{len(dataloader)} | Loss:{loss.item():.4f} | mIoU:{get_miou(confusion_matrix):.2f}%"
-            )
+        print(
+            f"E:{epoch+1}, I:{i}/{len(dataloader)} | Loss:{loss.item():.4f} | mIoU:{get_miou(confusion_matrix):.2f}%"
+        )
 
     val_loss, val_miou = eval(model, val_loader, loss_fn, device, NUM_CLASSES)
     print(
