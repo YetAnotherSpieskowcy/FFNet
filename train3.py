@@ -9,7 +9,7 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 
 
-NUM_CLASSES, IGNORE_INDEX = 19, 255
+NUM_CLASSES, IGNORE_INDEX = 3, 255
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", type=int, default=8)

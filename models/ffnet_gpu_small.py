@@ -219,7 +219,7 @@ def segmentation_ffnet18_dAAC():
     return create_ffnet(
         ffnet_head_type="A",
         task="segmentation_C",
-        num_classes=19,
+        num_classes=3,
         model_name="ffnnet18_dAAC",
         backbone=resnet.Resnet18_D,
         pre_downsampling=False,
