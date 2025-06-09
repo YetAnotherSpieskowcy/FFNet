@@ -44,6 +44,7 @@ def return_dataloader(num_workers, batch_size, mode="train"):
         shuffle=False,
         drop_last=False,
         sampler=val_sampler,
+        pin_memory=True,
     )
 
     return val_loader

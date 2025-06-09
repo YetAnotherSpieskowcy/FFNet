@@ -4,8 +4,9 @@ import torch
 import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from datasets.cityscapes.dataloader.get_dataloaders import return_dataloader
-from models.ffnet_S_gpu_small import segmentation_ffnet150S_dBBB
+from models.ffnet_gpu_small import segmentation_ffnet18_dAAC
 from torch.cuda.amp import GradScaler, autocast
+from torch.utils.tensorboard import SummaryWriter
 
 
 NUM_CLASSES, IGNORE_INDEX = 19, 255
@@ -20,7 +21,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.backends.cudnn.benchmark = True
 os.makedirs(args.output_dir, exist_ok=True)
 
-model = segmentation_ffnet150S_dBBB().to(device)
+model = segmentation_ffnet18_dAAC().to(device)
 dataloader = return_dataloader(
     batch_size=args.batch_size, num_workers=args.num_workers, mode="train"
 )
@@ -31,8 +32,11 @@ loss_fn = CrossEntropyLoss(ignore_index=IGNORE_INDEX)
 optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4, weight_decay=4e-5)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 scaler = GradScaler()
+writer = SummaryWriter(args.output_dir)
 
 best_miou = 0
+
+print(model)
 
 
 def get_miou(cm):
@@ -99,11 +103,17 @@ for epoch in range(150):
             (labels[mask] * NUM_CLASSES + preds[mask]), minlength=NUM_CLASSES**2
         ).reshape(NUM_CLASSES, NUM_CLASSES)
 
+        writer.add_scalar("Loss/train", loss.item(), epoch * len(dataloader) + i)
+        writer.add_scalar(
+            "mIoU/train", get_miou(confusion_matrix), epoch * len(dataloader) + i
+        )
         print(
             f"E:{epoch+1}, I:{i}/{len(dataloader)} | Loss:{loss.item():.4f} | mIoU:{get_miou(confusion_matrix):.2f}%"
         )
 
     val_loss, val_miou = eval(model, val_loader, loss_fn, device, NUM_CLASSES)
+    writer.add_scalar("Loss/val", val_loss, epoch)
+    writer.add_scalar("mIoU/val", val_miou, epoch)
     print(
         f"--- Epoch {epoch+1} Summary: Val Loss:{val_loss:.4f} | Val mIoU:{val_miou:.2f}% ---"
     )
@@ -114,3 +124,5 @@ for epoch in range(150):
         torch.save(model.state_dict(), save_path)
         print(f"*** New best saved to {save_path} with mIoU: {val_miou:.2f}% ***")
     scheduler.step()
+    writer.flush()
+writer.close()
