@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.3.1-devel-ubuntu20.04
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -6,15 +6,18 @@ RUN apt update && \
     apt install -y software-properties-common && \ 
     add-apt-repository ppa:deadsnakes/ppa -y && \ 
     apt update && \ 
-    apt install -y python3.8 python3.8-venv git ffmpeg libsm6 libxext6
+    apt install -y python3 python3-venv python3-dev git ffmpeg libsm6 libxext6
 
 ENV VIRTUAL_ENV=/opt/venv
-RUN python3.8 -m venv $VIRTUAL_ENV
+RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-RUN pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113 && \
-    pip install numpy opencv_python Pillow rmi-pytorch runx scikit_image scipy six tensorboard
+RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 && \
+    pip install numpy opencv_python Pillow rmi-pytorch runx scikit_image scipy six tensorboard torchao && \
+    pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
 
-RUN git clone https://github.com/YetAnotherSpieskowcy/FFNet.git -b baseline-train
+# RUN git clone https://github.com/YetAnotherSpieskowcy/FFNet.git -b baseline-train
+
+COPY . FFNet/
 
 ENTRYPOINT bash

@@ -7,6 +7,14 @@ from datasets.cityscapes.dataloader.get_dataloaders import return_dataloader
 from models.ffnet_gpu_small import segmentation_ffnet18_dAAC
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
+from torchao.sparsity.training import (
+    SemiSparseLinear,
+    swap_linear_with_semi_sparse_linear,
+)
+from torchao.sparsity.training import (
+    SemiSparseLinear,
+    swap_linear_with_semi_sparse_linear,
+)
 
 
 NUM_CLASSES, IGNORE_INDEX = 3, 255
@@ -22,6 +30,8 @@ torch.backends.cudnn.benchmark = True
 os.makedirs(args.output_dir, exist_ok=True)
 
 model = segmentation_ffnet18_dAAC().to(device)
+model = torch.compile(model)
+swap_linear_with_semi_sparse_linear(model, {"seq.0": SemiSparseLinear})
 dataloader = return_dataloader(
     batch_size=args.batch_size, num_workers=args.num_workers, mode="train"
 )
