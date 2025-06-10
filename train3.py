@@ -32,6 +32,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--num_workers", type=int, default=4)
 parser.add_argument("--output_dir", type=str, default="weight")
+parser.add_argument("--epochs", type=int, default=150)
+parser.add_argument("--sparsity_target", type=float, default=.75)
 args = parser.parse_args()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -100,14 +102,14 @@ def eval(model, dataloader, loss_fn, device, num_classes):
     return total_loss / len(dataloader), get_miou(confusion_matrix)
 
 
-for epoch in range(40):
+for epoch in range(args.epochs):
     model.train()
     epoch_loss = 0.0
     confusion_matrix = torch.zeros(
         (NUM_CLASSES, NUM_CLASSES), device=device, dtype=torch.long
     )
     if epoch > 0 and epoch % 5 == 0:
-        sparsity_target = 0.5 * (epoch / 10.0)
+        sparsity_target = args.sparsity_target * (epoch / args.epochs)
         prune.global_unstructured(
             parameters_to_prune,
             pruning_method=prune.L1Unstructured,
