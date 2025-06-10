@@ -15,7 +15,16 @@ from torchao.sparsity.training import (
     SemiSparseLinear,
     swap_linear_with_semi_sparse_linear,
 )
-
+import torch.nn.utils.prune as prune
+from torchao.quantization import (
+    quantize_,
+    Int8DynamicActivationInt4WeightConfig,
+)
+from torchao.quantization.qat import (
+    FakeQuantizeConfig,
+    FromIntXQuantizationAwareTrainingConfig,
+    IntXQuantizationAwareTrainingConfig,
+)
 
 NUM_CLASSES, IGNORE_INDEX = 3, 255
 
@@ -31,7 +40,16 @@ os.makedirs(args.output_dir, exist_ok=True)
 
 model = segmentation_ffnet18_dAAC().to(device)
 model = torch.compile(model)
-swap_linear_with_semi_sparse_linear(model, {"seq.0": SemiSparseLinear})
+activation_config = FakeQuantizeConfig(torch.int8, "per_token", is_symmetric=False)
+weight_config = FakeQuantizeConfig(torch.int4, group_size=32)
+quantize_(
+    model,
+    IntXQuantizationAwareTrainingConfig(activation_config, weight_config),
+)
+parameters_to_prune = []
+for module_name, module in model.named_modules():
+    if isinstance(module, torch.nn.Conv2d):
+        parameters_to_prune.append((module, "weight"))
 dataloader = return_dataloader(
     batch_size=args.batch_size, num_workers=args.num_workers, mode="train"
 )
@@ -82,12 +100,19 @@ def eval(model, dataloader, loss_fn, device, num_classes):
     return total_loss / len(dataloader), get_miou(confusion_matrix)
 
 
-for epoch in range(150):
+for epoch in range(40):
     model.train()
     epoch_loss = 0.0
     confusion_matrix = torch.zeros(
         (NUM_CLASSES, NUM_CLASSES), device=device, dtype=torch.long
     )
+    if epoch > 0 and epoch % 5 == 0:
+        sparsity_target = 0.5 * (epoch / 10.0)
+        prune.global_unstructured(
+            parameters_to_prune,
+            pruning_method=prune.L1Unstructured,
+            amount=sparsity_target,
+        )
 
     for i, (images, labels, _, _, _) in enumerate(dataloader, 1):
         images, labels = images.to(device), labels.to(device, dtype=torch.long)
@@ -135,4 +160,14 @@ for epoch in range(150):
         print(f"*** New best saved to {save_path} with mIoU: {val_miou:.2f}% ***")
     scheduler.step()
     writer.flush()
+
+
+for module, name in parameters_to_prune:
+    prune.remove(module, name)
+sparse_save_path = os.path.join(args.output_dir, "sparse_model.pth")
+torch.save(model.state_dict(), sparse_save_path)
+quantize_(model, FromIntXQuantizationAwareTrainingConfig())
+quantize_(model, Int8DynamicActivationInt4WeightConfig(group_size=32))
+quantized_save_path = os.path.join(args.output_dir, "quantized_model.pth")
+torch.save(model.state_dict(), quantized_save_path)
 writer.close()
